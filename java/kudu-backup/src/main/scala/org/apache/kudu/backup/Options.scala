@@ -41,7 +41,8 @@ case class BackupOptions(
     keepAlivePeriodMs: Long = BackupOptions.DefaultKeepAlivePeriodMs,
     failOnFirstError: Boolean = BackupOptions.DefaultFailOnFirstError,
     numParallelBackups: Int = BackupOptions.DefaultNumParallelBackups,
-    splitSizeBytes: Option[Long] = None)
+    splitSizeBytes: Option[Long] = None,
+    tabletsId: String = BackupOptions.DefaultTabletsId)
 
 object BackupOptions {
   val DefaultForceFull: Boolean = false
@@ -57,6 +58,7 @@ object BackupOptions {
   val DefaultFailOnFirstError: Boolean = false
   val DefaultNumParallelBackups = 1
   val DefaultSplitSizeBytes: Option[Long] = None
+  val DefaultTabletsId = "all"
 
   // We use the program name to make the help output show a the spark invocation required.
   val ClassName: String = KuduBackup.getClass.getCanonicalName.dropRight(1) // Remove trailing `$`
@@ -156,6 +158,11 @@ object BackupOptions {
             "will be split to generate uniform task sizes instead of the default of 1 task per " +
             "tablet. This option is experimental.")
         .hidden()
+        .optional()
+
+      opt[String]("tabletsId")
+        .action((v, o) => o.copy(tabletsId = v))
+        .text("Comma-separated tablets id to backup. Default: " + BackupOptions.DefaultTabletsId)
         .optional()
 
       help("help").text("prints this usage text")

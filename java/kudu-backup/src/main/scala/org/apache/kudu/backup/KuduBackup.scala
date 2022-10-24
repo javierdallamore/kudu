@@ -78,7 +78,13 @@ object KuduBackup {
     val jobTypeStr = if (incremental) "incremental" else "full"
     session.sparkContext.setJobDescription(s"Kudu Backup($jobTypeStr): $tableName")
 
-    val rdd = new KuduBackupRDD(table, tableOptions, incremental, context, session.sparkContext)
+    val rdd = new KuduBackupRDD(
+      table,
+      tableOptions,
+      incremental,
+      tableOptions.tabletsId.split(","),
+      context,
+      session.sparkContext)
     val df =
       session.sqlContext
         .createDataFrame(rdd, BackupUtils.dataSchema(table.getSchema, incremental))

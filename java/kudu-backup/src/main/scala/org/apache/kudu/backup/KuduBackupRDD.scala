@@ -41,6 +41,7 @@ class KuduBackupRDD private[kudu] (
     @transient val table: KuduTable,
     @transient val options: BackupOptions,
     val incremental: Boolean,
+    val tabletsId: Array[String],
     val kuduContext: KuduContext,
     @transient val sc: SparkContext)
     extends RDD[Row](sc, Nil) {
@@ -82,20 +83,28 @@ class KuduBackupRDD private[kudu] (
 
     // Create the scan tokens for each partition.
     val tokens = builder.build()
-    tokens.asScala.zipWithIndex.map {
-      case (token, index) =>
-        // Only list the leader replica as the preferred location if
-        // replica selection policy is leader only, to take advantage
-        // of scan locality.
-        val locations: Array[String] = {
-          if (options.scanLeaderOnly) {
-            Array(token.getTablet.getLeaderReplica.getRpcHost)
-          } else {
-            token.getTablet.getReplicas.asScala.map(_.getRpcHost).toArray
+    tokens.asScala
+      .filter(token => {
+        val tabletId =
+          new String(token.getTablet.getTabletId(), java.nio.charset.StandardCharsets.UTF_8)
+        tabletsId.isEmpty || tabletsId.contains("all") || tabletsId.contains(tabletId)
+      })
+      .zipWithIndex
+      .map {
+        case (token, index) =>
+          // Only list the leader replica as the preferred location if
+          // replica selection policy is leader only, to take advantage
+          // of scan locality.
+          val locations: Array[String] = {
+            if (options.scanLeaderOnly) {
+              Array(token.getTablet.getLeaderReplica.getRpcHost)
+            } else {
+              token.getTablet.getReplicas.asScala.map(_.getRpcHost).toArray
+            }
           }
-        }
-        KuduBackupPartition(index, token.serialize(), locations)
-    }.toArray
+          KuduBackupPartition(index, token.serialize(), locations)
+      }
+      .toArray
   }
 
   override def compute(part: Partition, taskContext: TaskContext): Iterator[Row] = {
